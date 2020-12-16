@@ -1359,3 +1359,78 @@ Redis进程会执行fork创建子进程，RDB持久化由子进程进行，完�
 > 如果aof文件有错误，这时候redis是启动不起来，需要修复这个aof文件
 >
 > redis给我们提供了一个工具redis-check-aof --fix 
+
+
+
+
+
+## Redis主从复制
+
+### 概念
+
+主从复制，是将一台redis服务器的数据复制到其他的都redis服务器。前者称为主节点，后者称为从节点。==数据的复制是单向的，只能有主节点到从节点==。
+
+主从复制 的作用主要包括：
+
+1. 数据冗余
+2. 故障恢复
+3. 负载均衡
+4. 高可用基石
+
+### 环境配置
+
+> 只配置从库，不用配置主库。
+
+```bash
+127.0.0.1:6379> info replication #查看当前库的信息
+# Replication
+role:master #角色 master
+connected_slaves:0 #没有从机连接
+master_replid:c3c3c9b594a199ab0e18d986d8b608a64cf55ae6
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:0
+second_repl_offset:-1
+repl_backlog_active:0
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:0
+repl_backlog_histlen:0
+```
+
+==redis默认都是主机==,一般情况下只用配置从机就行
+
+```bash
+slaveof 192.168.200.101 6379
+
+127.0.0.1:6379> info replication
+# Replication
+role:master
+connected_slaves:2
+slave0:ip=192.168.200.103,port=6379,state=online,offset=714,lag=1
+slave1:ip=192.168.200.102,port=6379,state=online,offset=714,lag=1
+master_replid:d959b7ced4224240544a3a362656f55445e69055
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:714
+second_repl_offset:-1
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1
+repl_backlog_histlen:714
+```
+
+==使用命令配置，只是暂时的，真实的主从复制是从配置文件中配置的==
+
+> 细节
+
+主机负责写，从机不能写只能读！主机中所有的信息和数据都会自动的被从机保存。
+
+> 复制原理
+
+Slave启动成功连接到master后会发送一个sync同步命令
+
+Master接到命令，启动后台存盘进程，同时收集所有接收到用于修改数据集的命令，在后台进程执行完毕之后，master将传送整个数据文件到slave，并完成一次完全同步。
+
+==全量复制==：slave服务在接收到数据库文件数据后，将其存盘并加载到内存中
+
+==增量复制==：Master继续将新的所有收集到的修改命令依次传给slave，完成同步
+
+但是只要重新连接master，一次完全同步（全量复制）将会自动执行！数据一定可以从从机中看到。
